@@ -199,3 +199,17 @@ while True:
                     print(f"Version updated to {latest_version} in version.txt")
                 except Exception as e:
                     print(f"Error writing to version.txt: {e}")
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    git:
+                    git config --global user.email "ahona.omi0818@google.com"
+                     git config user.name "ahona-omi"
+                     
+                     

@@ -1,0 +1,10 @@
+--- src/kern/include/kern/sys_init.h	2024-10-01 09:37:33.000000000 +0600
++++ src/kern/include/kern/sys_init.h	2024-09-24 19:56:33.000000000 +0600
+@@ -39,7 +39,6 @@
+ #define SET_ACT_DEV(QUEUE,DEV)  (QUEUE |= DEV)
+ void __sys_init(void); 
+ void SoftReset(void);
+-void display_group_info();
+ uint32_t verify_connectivity(void);
+ 
+ #ifdef __cplusplus

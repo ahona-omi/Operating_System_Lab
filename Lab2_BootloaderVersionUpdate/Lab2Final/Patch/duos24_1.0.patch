@@ -1,0 +1,142 @@
+Only in duos24_1.0/src/compile/build: final.elf
+Only in duos24_1.0/src/compile/build: final.map
+diff -ur duos24/src/compile/Makefile duos24_1.0/src/compile/Makefile
+--- duos24/src/compile/Makefile	2024-09-30 23:22:59.000000000 +0600
++++ duos24_1.0/src/compile/Makefile	2024-11-13 23:01:14.000000000 +0600
+@@ -216,7 +216,5 @@
+ clean:
+ 	rm -rf $(OBJECT)/*.o $(MAPDIR)/*.map $(TARGET)/* *.o *.elf build/*
+ 
+-# To Students -- Modify to match with the appropriate driver file.
+ load:
+ 	openocd -f /usr/share/openocd/scripts/board/stm32f4discovery.cfg -f /usr/share/openocd/scripts/interface/stlink.cfg -c "program target/duos verify reset exit"
+-
+Only in duos24_1.0/src/compile/object: cm4.o
+Only in duos24_1.0/src/compile/object: debug.o
+Only in duos24_1.0/src/compile/object: kfloat.o
+Only in duos24_1.0/src/compile/object: kmain.o
+Only in duos24_1.0/src/compile/object: kmath.o
+Only in duos24_1.0/src/compile/object: kstdio.o
+Only in duos24_1.0/src/compile/object: kstring.o
+Only in duos24_1.0/src/compile/object: ktimes.o
+Only in duos24_1.0/src/compile/object: kunistd.o
+Only in duos24_1.0/src/compile/object: mcu_info.o
+Only in duos24_1.0/src/compile/object: serial_lin.o
+Only in duos24_1.0/src/compile/object: stm32_startup.o
+Only in duos24_1.0/src/compile/object: syscall.o
+Only in duos24_1.0/src/compile/object: sys_clock.o
+Only in duos24_1.0/src/compile/object: sys_err.o
+Only in duos24_1.0/src/compile/object: sys_gpio.o
+Only in duos24_1.0/src/compile/object: sys_init.o
+Only in duos24_1.0/src/compile/object: sys_rtc.o
+Only in duos24_1.0/src/compile/object: sys_spi.o
+Only in duos24_1.0/src/compile/object: sys_timer.o
+Only in duos24_1.0/src/compile/object: sys_usart.o
+Only in duos24_1.0/src/compile/object: timer.o
+Only in duos24_1.0/src/compile/object: times.o
+Only in duos24_1.0/src/compile/object: unistd.o
+Only in duos24_1.0/src/compile/object: UsartRingBuffer.o
+Only in duos24_1.0/src/compile/target: duos
+diff -ur duos24/src/kern/arch/stm32f446re/linker/linker.ld duos24_1.0/src/kern/arch/stm32f446re/linker/linker.ld
+--- duos24/src/kern/arch/stm32f446re/linker/linker.ld	2023-10-15 15:05:22.000000000 +0600
++++ duos24_1.0/src/kern/arch/stm32f446re/linker/linker.ld	2024-11-13 19:40:54.000000000 +0600
+@@ -1,7 +1,7 @@
+ ENTRY(Reset_Handler)
+ MEMORY
+ {
+-	FLASH(RX): ORIGIN = 0x08000000, LENGTH = 512K
++	FLASH(RX): ORIGIN = 0x08010000, LENGTH = 320K
+ 	SRAM(RWX): ORIGIN = 0x20000000, LENGTH = 128K /* combined both SRAM1 and SRAM2 */
+ }
+ /* Sections placement in the memory */
+diff -ur duos24/src/kern/include/kern/sys_init.h duos24_1.0/src/kern/include/kern/sys_init.h
+--- duos24/src/kern/include/kern/sys_init.h	2024-09-24 19:56:33.000000000 +0600
++++ duos24_1.0/src/kern/include/kern/sys_init.h	2024-11-13 23:29:46.000000000 +0600
+@@ -37,9 +37,11 @@
+ #include<stdint.h>
+ 
+ #define SET_ACT_DEV(QUEUE,DEV)  (QUEUE |= DEV)
++#define VERSION_ADDR ((volatile uint32_t *)0x2000FFFCU)
+ void __sys_init(void); 
+ void SoftReset(void);
+ uint32_t verify_connectivity(void);
++void display_os_details(void);
+ 
+ #ifdef __cplusplus
+ }
+diff -ur duos24/src/kern/kmain/kmain.c duos24_1.0/src/kern/kmain/kmain.c
+--- duos24/src/kern/kmain/kmain.c	2024-09-30 23:19:01.000000000 +0600
++++ duos24_1.0/src/kern/kmain/kmain.c	2024-11-06 19:57:25.000000000 +0600
+@@ -39,8 +39,16 @@
+ #ifndef DEBUG
+ #define DEBUG 1
+ #endif
++
++#define BOOTLOADER_SIZE         (0x00010000U) //64 KB
++
++static void vector_setup(void){
++    SCB->VTOR = BOOTLOADER_SIZE; 
++}
++
+ void kmain(void)
+ {
++    vector_setup();
+     __sys_init();
+     while (1)
+     {
+diff -ur duos24/src/kern/lib/kern/sys_init.c duos24_1.0/src/kern/lib/kern/sys_init.c
+--- duos24/src/kern/lib/kern/sys_init.c	2024-10-01 00:33:03.000000000 +0600
++++ duos24_1.0/src/kern/lib/kern/sys_init.c	2024-11-14 03:00:25.000000000 +0600
+@@ -46,6 +46,7 @@
+ #endif
+ extern UART_HandleTypeDef huart6;
+ 
++
+ void __sys_init(void)
+ {
+ 	__init_sys_clock(); //configure system clock 180 MHz
+@@ -61,17 +62,19 @@
+ 	Ringbuf_init(&huart6);
+ 	ConfigTimer2ForSystem();
+ 	__ISB();
++
+ 	#ifdef DEBUG
+-	kprintf("\n************************************\r\n");
+-	kprintf("Booting Machine Intelligence System 1.0 .....\r\n");
+-	kprintf("Copyright (c) 2024, Prof. Mosaddek Tushar, CSE, DU\r\n");
+-	kprintf("CPUID %x\n", SCB->CPUID);
+-	kprintf("OS Version: 2024.1.0.0\n");
+-	kprintf("Time Elapse %d ms\n",__getTime());
+-	kprintf("*************************************\r\n");
+-	kprintf("# ");
+-	show_system_info();
+-	display_group_info();
++	// kprintf("\n************************************\r\n");
++	// kprintf("Booting Machine Intelligence System 1.0 .....\r\n");
++	// kprintf("Copyright (c) 2024, Prof. Mosaddek Tushar, CSE, DU\r\n");
++	// kprintf("CPUID %x\n", SCB->CPUID);
++	// kprintf("OS Version: 2024.1.0.0\n");
++	// kprintf("Time Elapse %d ms\n",__getTime());
++	// kprintf("*************************************\r\n");
++	// kprintf("# ");
++	// show_system_info();
++	display_os_details();
++
+ 	#endif
+ }
+ 
+@@ -84,12 +87,7 @@
+ 	__debugRamUsage();
+ }
+ 
+-/*
+-* Display your Full Name, Registration Number and Class Roll
+-* Each line displays a student or group member information
+-*/
+-void display_group_info(void)
++void display_os_details(void)
+ {
+-	kprintf("Empty Group!! -- Update Now\n")
+-
++    kprintf("Welcome duos24 1.0\n");
+ }

@@ -1,0 +1,11 @@
+{
+    "files.associations": {
+        "sys_usart.h": "c",
+        "sys_init.h": "c",
+        "cm4.h": "c",
+        "usartringbuffer.h": "c",
+        "sys_clock.h": "c",
+        "serial_lin.h": "c",
+        "timer.h": "c"
+    }
+}
